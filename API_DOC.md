@@ -1,96 +1,116 @@
 # Chat History Backend API
 
-This document explains how to run and use the Chat History Backend API provided in this repository.
+This document describes how to install, run, and use the Chat History Backend API in this repository.
 
-## Overview
+## 1. Overview
 
-This is a small Express + MongoDB backend that stores chat sessions and messages. The API exposes endpoints for creating sessions, listing sessions for a user, saving chat messages, and retrieving chat history for a session.
+The backend is a small Express + MongoDB service for managing:
 
-Base URL (when running locally):
+- chat sessions
+- chat messages inside each session
+- deletion of sessions and related chat history
+
+Base URL when running locally:
 
 http://localhost:<PORT>
 
-All endpoints are prefixed with `/api` (for example: `http://localhost:<PORT>/api/sessions`).
+All routes are prefixed with `/api`.
 
-## Requirements
+Example:
 
-- Node.js (16+ recommended)
-- A MongoDB connection string
-- Environment variables configured in a `.env` file
+http://localhost:3000/api/sessions
 
-## Environment variables
+---
 
-Create a `.env` file in the project root with the following values:
+## 2. Requirements
 
-MONGO_URI=<your-mongodb-connection-string>
+- Node.js 16 or newer
+- MongoDB Atlas or another MongoDB instance
+- A `.env` file with `MONGO_URI` and `PORT`
+
+---
+
+## 3. Environment Variables
+
+Create a `.env` file in the project root:
+
+```env
+MONGO_URI=mongodb://localhost:27017/chat-history
+# or: MONGODB_URI=mongodb://localhost:27017/chat-history
 PORT=3000
+```
 
-Replace `<your-mongodb-connection-string>` with your MongoDB URI.
+The server accepts either `MONGO_URI` or `MONGODB_URI`. Replace the value with your real MongoDB connection string.
 
-## Install dependencies
+---
 
-Open PowerShell in the project folder and run:
+## 4. Install and Run
+
+Install dependencies:
 
 ```powershell
 npm install
 ```
 
-## Start the server
+Start the server:
 
-Run the server with:
+```powershell
+npm start
+```
+
+You can also run it directly with:
 
 ```powershell
 node server.js
 ```
 
-If you want, add a `start` script to `package.json`:
+---
+
+## 5. Data Models
+
+### Session
+
+- `userId` (string, required)
+- `sessionId` (string, required, unique)
+- `title` (string, optional, default: `New Chat`)
+- `createdAt` (Date, auto-generated)
+
+### Chat
+
+- `sessionId` (string, required)
+- `userId` (string, required)
+- `role` (string, required; usually `user` or `bot`)
+- `message` (string, required)
+- `createdAt` (Date, auto-generated)
+
+---
+
+## 6. API Endpoints
+
+All responses are JSON.
+
+### 6.1 Create a session
+
+- Method: `POST`
+- URL: `/api/sessions`
+
+Request body:
 
 ```json
-"scripts": {
-  "start": "node server.js"
+{
+  "sessionId": "sess-123",
+  "userId": "user-1",
+  "title": "Support chat"
 }
 ```
 
-Then start with `npm start`.
-
-## Models (quick reference)
-
-Session
-- userId: string (required)
-- sessionId: string (required, unique)
-- title: string (optional, default: "New Chat")
-- createdAt: Date
-
-Chat
-- sessionId: string (required)
-- userId: string (required)
-- role: string (`user` or `bot`) (required)
-- message: string (required)
-- createdAt: Date
-
-## API Endpoints
-
-All endpoints return JSON.
-
-1) Create a new session
-
-- URL: POST /api/sessions
-- Body (application/json):
-  {
-    "sessionId": "string",
-    "userId": "string",
-    "title": "optional title"
-  }
-- Response: 200 OK
-  Returns the created session object.
-
-Example (PowerShell using curl):
+Example:
 
 ```powershell
 curl -Method POST -Uri http://localhost:3000/api/sessions -Headers @{"Content-Type"="application/json"} -Body (@{sessionId="sess-123"; userId="user-1"; title="Support chat"} | ConvertTo-Json)
 ```
 
-Sample response:
+Success response:
 
 ```json
 {
@@ -98,16 +118,17 @@ Sample response:
   "userId": "user-1",
   "sessionId": "sess-123",
   "title": "Support chat",
-  "createdAt": "2025-10-04T...",
+  "createdAt": "2026-06-11T12:00:00.000Z",
   "__v": 0
 }
 ```
 
-2) List all sessions for a user
+---
 
-- URL: GET /api/sessions/:userId
-- Response: 200 OK
-  Returns an array of session objects sorted newest first.
+### 6.2 List sessions for a user
+
+- Method: `GET`
+- URL: `/api/sessions/:userId`
 
 Example:
 
@@ -115,11 +136,27 @@ Example:
 curl http://localhost:3000/api/sessions/user-1
 ```
 
-3) Get chat history for a session
+Success response:
 
-- URL: GET /api/chats/:sessionId
-- Response: 200 OK
-  Returns an array of chat messages sorted oldest first.
+```json
+[
+  {
+    "_id": "<mongo-id>",
+    "userId": "user-1",
+    "sessionId": "sess-123",
+    "title": "Support chat",
+    "createdAt": "2026-06-11T12:00:00.000Z",
+    "__v": 0
+  }
+]
+```
+
+---
+
+### 6.3 Get chat history for a session
+
+- Method: `GET`
+- URL: `/api/chats/:sessionId`
 
 Example:
 
@@ -127,7 +164,47 @@ Example:
 curl http://localhost:3000/api/chats/sess-123
 ```
 
-Sample chat item:
+Success response:
+
+```json
+[
+  {
+    "_id": "<mongo-id>",
+    "sessionId": "sess-123",
+    "userId": "user-1",
+    "role": "user",
+    "message": "Hello, help me",
+    "createdAt": "2026-06-11T12:00:00.000Z",
+    "__v": 0
+  }
+]
+```
+
+---
+
+### 6.4 Save a chat message
+
+- Method: `POST`
+- URL: `/api/chats`
+
+Request body:
+
+```json
+{
+  "sessionId": "sess-123",
+  "userId": "user-1",
+  "role": "user",
+  "message": "Hello there"
+}
+```
+
+Example:
+
+```powershell
+curl -Method POST -Uri http://localhost:3000/api/chats -Headers @{"Content-Type"="application/json"} -Body (@{sessionId="sess-123"; userId="user-1"; role="user"; message="Hello there"} | ConvertTo-Json)
+```
+
+Success response:
 
 ```json
 {
@@ -135,36 +212,18 @@ Sample chat item:
   "sessionId": "sess-123",
   "userId": "user-1",
   "role": "user",
-  "message": "Hello, help me",
-  "createdAt": "2025-10-04T...",
+  "message": "Hello there",
+  "createdAt": "2026-06-11T12:00:00.000Z",
   "__v": 0
 }
 ```
 
-4) Save a chat message
+---
 
-- URL: POST /api/chats
-- Body (application/json):
-  {
-    "sessionId": "sess-123",
-    "userId": "user-1",
-    "role": "user|bot",
-    "message": "The message text"
-  }
-- Response: 200 OK
-  Returns the created chat object.
+### 6.5 Delete all chats for one session
 
-Example:
-
-```powershell
-curl -Method POST -Uri http://localhost:3000/api/chats -Headers @{"Content-Type"="application/json"} -Body (@{sessionId="sess-123"; userId="user-1"; role="user"; message="Hello"} | ConvertTo-Json)
-```
-
-5) Delete all chats for a session
-
-- URL: DELETE /api/chats/:sessionId
-- Response: 200 OK
-  Returns a message confirming deletion.
+- Method: `DELETE`
+- URL: `/api/chats/:sessionId`
 
 Example:
 
@@ -172,23 +231,20 @@ Example:
 curl -Method DELETE http://localhost:3000/api/chats/sess-123
 ```
 
-6) Delete all chats for a user
+Success response:
 
-- URL: DELETE /api/chats/user/:userId
-- Response: 200 OK
-  Returns a message confirming deletion.
-
-Example:
-
-```powershell
-curl -Method DELETE http://localhost:3000/api/chats/user/user-1
+```json
+{
+  "message": "All chats for session 'sess-123' deleted."
+}
 ```
 
-7) Delete a session and its chats
+---
 
-- URL: DELETE /api/sessions/:sessionId
-- Response: 200 OK
-  Returns a message confirming the session and its chats were deleted.
+### 6.6 Delete a session and its chats
+
+- Method: `DELETE`
+- URL: `/api/sessions/:sessionId`
 
 Example:
 
@@ -196,33 +252,79 @@ Example:
 curl -Method DELETE http://localhost:3000/api/sessions/sess-123
 ```
 
-Error responses
-
-- When a route encounters an error (validation, DB error, etc.) the API returns a 400 status with JSON in the form:
+Success response:
 
 ```json
-{ "error": "<error message>" }
+{
+  "message": "Session 'sess-123' and its chats deleted."
+}
 ```
-
-Include error handling in your client code for 400 responses.
-
-## Notes and behavior
-
-- The API uses CORS and accepts JSON requests.
-- There is no authentication by default. If you need to secure the API, add middleware to `server.js` or `routes/chatRoutes.js`.
-- MongoDB connection is required. The server will attempt to connect to `process.env.MONGO_URI` on start.
-- Timestamps are stored in `createdAt` on both Session and Chat documents.
-
-## Troubleshooting
-
-- If the server doesn't start, check that `MONGO_URI` and `PORT` are set in `.env`.
-- Check console output for errors; the server logs MongoDB connection status.
-
-## Extending
-
-- Add pagination to the `GET /api/chats/:sessionId` endpoint if chat history becomes large.
-- Add user authentication (JWT or session-based) to restrict access to a user's own sessions and chats.
 
 ---
 
-If you'd like, I can also add a `README.md` with the same content, example Postman collection, or a simple `npm run start` script in `package.json`.
+### 6.7 Delete all sessions and chats for one user
+
+- Method: `DELETE`
+- URL: `/api/sessions/user/:userId`
+
+Example:
+
+```powershell
+curl -Method DELETE http://localhost:3000/api/sessions/user/user-1
+```
+
+Success response:
+
+```json
+{
+  "message": "All sessions and chats for user 'user-1' deleted."
+}
+```
+
+---
+
+## 7. Error Responses
+
+If validation or database logic fails, the API returns a `400` status code with this JSON format:
+
+```json
+{
+  "error": "<error message>"
+}
+```
+
+Example:
+
+```json
+{
+  "error": "Chat validation failed: role: Path `role` is required."
+}
+```
+
+---
+
+## 8. Notes and Behavior
+
+- The API uses CORS and accepts JSON requests.
+- There is no authentication by default.
+- MongoDB must be available before the server starts.
+- Timestamps are stored in `createdAt` for both sessions and chat messages.
+- This API currently supports deleting all chats for a session, not deleting a single chat message by its own ID.
+
+---
+
+## 9. Troubleshooting
+
+- Verify that `MONGO_URI` and `PORT` are set in `.env`.
+- Check the console output for MongoDB connection errors.
+- If a route returns `400`, inspect the error message and confirm the request body matches the expected schema.
+
+---
+
+## 10. Future Improvements
+
+Possible enhancements:
+
+- Add pagination for `GET /api/chats/:sessionId`
+- Add authentication and authorization
+- Add a dedicated endpoint to delete one chat message by ID
